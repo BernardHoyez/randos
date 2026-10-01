@@ -222,3 +222,5 @@ npm run apk:release
 - **Plugin `Mbtiles` non défini côté JS** → relancer `npm run sync`, puis reconstruire.
 - **`./gradlew` introuvable sous Windows** → déjà résolu par `scripts/gradle.js`, inutile de lancer
   Gradle à la main.
+#   r a n d o s  
+ 
