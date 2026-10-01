@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f5f3f">
+  <title>RandoMBTiles</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="bar">
+    <button id="btn-lock" title="Verrouiller les boutons (recommandé en poche)">🔓</button>
+    <select id="basemap" aria-label="Fond de carte"></select>
+    <button id="btn-mbt" title="Importer un fichier MBTiles">MBTiles</button>
+    <button id="btn-xyz" title="Ajouter un fond XYZ">+XYZ</button>
+    <button id="btn-offline" title="Préparer le hors-ligne (télécharger la zone visible)">📥</button>
+    <button id="btn-import" title="Importer GPX / KML / KMZ">Import</button>
+    <select id="export" aria-label="Exporter">
+      <option value="">Export…</option>
+      <option value="gpx">GPX</option>
+      <option value="kml">KML</option>
+      <option value="kmz">KMZ</option>
+    </select>
+    <button id="btn-gps">GPS</button>
+    <button id="btn-wpt" title="Ajouter un waypoint">+WPT</button>
+    <button id="btn-rec">REC</button>
+    <button id="btn-traces" title="Liste des traces et waypoints">Traces</button>
+    <button id="btn-clear" title="Effacer les tracés">✕</button>
+  </header>
+  <div id="map">
+    <div id="compass" class="hidden" aria-hidden="true">
+      <svg viewBox="0 0 100 100" width="72" height="72">
+        <circle cx="50" cy="50" r="47" class="c-dial"/>
+        <text x="50" y="17" text-anchor="middle" class="c-label">N</text>
+        <text x="85" y="54" text-anchor="middle" class="c-label">E</text>
+        <text x="50" y="91" text-anchor="middle" class="c-label">S</text>
+        <text x="15" y="54" text-anchor="middle" class="c-label">O</text>
+        <g id="compass-needle">
+          <polygon points="50,11 44,50 50,44 56,50" class="c-needle-n"/>
+          <polygon points="50,89 44,50 50,56 56,50" class="c-needle-s"/>
+        </g>
+        <circle cx="50" cy="50" r="3" class="c-pivot"/>
+      </svg>
+      <div id="compass-heading">--°</div>
+    </div>
+  </div>
+  <footer id="status">Prêt</footer>
+  <input type="file" id="file" multiple hidden>
+  <input type="file" id="photo-file" accept="image/*" capture="environment" hidden>
+
+  <div id="traces-panel" class="hidden" role="dialog" aria-label="Liste des traces">
+    <div id="traces-header">
+      <strong>Traces &amp; waypoints</strong>
+      <button id="traces-close" aria-label="Fermer">✕</button>
+    </div>
+    <ul id="traces-list"></ul>
+    <p id="traces-empty" class="hidden">Aucune trace ni waypoint pour le moment.</p>
+    <hr>
+    <p class="muted">Chaque trace enregistrée est aussi sauvegardée automatiquement dans un fichier à part (protège contre un vidage de cache accidentel).</p>
+    <div id="traces-actions">
+      <button id="btn-export-backups">💾 Exporter les sauvegardes</button>
+    </div>
+  </div>
+
+  <div id="offline-panel" class="hidden" role="dialog" aria-label="Préparer le hors-ligne">
+    <div id="offline-header">
+      <strong>Préparer le hors-ligne</strong>
+      <button id="offline-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="offline-body">
+      <p id="offline-source"></p>
+      <div id="offline-zooms">
+        <label>Zoom min <input type="number" id="offline-zmin" min="0" max="22"></label>
+        <label>Zoom max <input type="number" id="offline-zmax" min="0" max="22"></label>
+      </div>
+      <p id="offline-estimate" class="muted"></p>
+      <div id="offline-actions">
+        <button id="offline-start">Télécharger la zone visible</button>
+        <button id="offline-cancel" class="hidden">Annuler</button>
+      </div>
+      <div id="offline-progress-wrap" class="hidden">
+        <div id="offline-progress-bar"><div id="offline-progress-fill"></div></div>
+        <p id="offline-progress-text" class="muted"></p>
+      </div>
+      <hr>
+      <p id="offline-cache-info" class="muted"></p>
+      <div id="offline-actions">
+        <button id="offline-clear-source">Vider ce fond</button>
+        <button id="offline-clear-all">Vider tout le cache</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="wpt-panel" class="hidden" role="dialog" aria-label="Nouveau waypoint">
+    <div id="wpt-header">
+      <strong>Nouveau waypoint</strong>
+      <button id="wpt-close" aria-label="Fermer">✕</button>
+    </div>
+    <div id="wpt-body">
+      <label class="wpt-field">Nom
+        <input type="text" id="wpt-name" value="Repère">
+      </label>
+      <label class="wpt-field">Description
+        <input type="text" id="wpt-desc" placeholder="Optionnelle">
+      </label>
+      <button id="wpt-photo-btn">📷 Ajouter une photo</button>
+      <div id="wpt-photo-preview" class="hidden">
+        <img id="wpt-photo-img" alt="">
+        <button id="wpt-photo-remove">Retirer la photo</button>
+      </div>
+      <div id="wpt-actions">
+        <button id="wpt-save">Valider</button>
+        <button id="wpt-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

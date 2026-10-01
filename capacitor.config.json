@@ -1,0 +1,8 @@
+{
+  "appId": "fr.bernardhoyez.randos",
+  "appName": "randos",
+  "webDir": "www",
+  "android": {
+    "useLegacyBridge": true
+  }
+}

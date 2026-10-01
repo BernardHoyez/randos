@@ -1,0 +1,15 @@
+{
+  "name": "rando-mbtiles",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Squelette Capacitor : cartes raster en ligne + MBTiles hors-ligne, import/export GPX/KML/KMZ",
+  "scripts": {
+    "vendor": "node scripts/copy-vendor.js",
+    "sync": "npm run vendor && npx cap sync android && node scripts/install-plugin.js",
+    "android": "npm run sync && npx cap open android",
+    "run:device": "npm run sync && npx cap run android",
+    "apk:debug": "npm run sync && node scripts/gradle.js assembleDebug",
+    "apk:release": "npm run sync && node scripts/gradle.js assembleRelease",
+    "aab:release": "npm run sync && node scripts/gradle.js bundleRelease"
+  }
+}
