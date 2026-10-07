@@ -1,7 +1,7 @@
 // Service worker "brise-cache" — utilisé uniquement pour la version web (GitHub Pages).
 // Dans l'APK, les fichiers sont embarqués : chaque nouvel APK = nouvelle version.
 // Incrémenter CACHE_NAME à chaque livraison touchant un fichier statique.
-const CACHE_NAME = 'rando-mbtiles-cache-v14';
+const CACHE_NAME = 'rando-mbtiles-cache-v30';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

@@ -7,6 +7,7 @@
    - position GPS et enregistrement de trace
    ====================================================================== */
 
+const APP_BUILD = 30; // à incrémenter avec CACHE_NAME dans sw.js — affiché au démarrage pour confirmer la version installée
 const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const P = isNative ? window.Capacitor.Plugins : {};
 const Mbtiles = P.Mbtiles;
@@ -14,6 +15,12 @@ const Mbtiles = P.Mbtiles;
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 const setStatus = (msg) => { statusEl.textContent = msg; };
+
+// Voile de chargement pour les traitements un peu longs (export KMZ avec photos, sauvegardes) :
+// bloque les doubles appuis accidentels et confirme que l'app travaille encore.
+const busyOverlay = $('busy-overlay');
+const showBusy = (msg) => { $('busy-text').textContent = msg; busyOverlay.classList.remove('hidden'); };
+const hideBusy = () => busyOverlay.classList.add('hidden');
 
 /* ---------------------------------------------------------------- fonds en ligne */
 
@@ -413,8 +420,14 @@ async function pruneBackups(maxFiles = 200) {
 
 async function exportBackups() {
   if (!isNative || !P.Filesystem) { setStatus('Sauvegardes disponibles uniquement dans l\'APK'); return; }
+  showBusy('Préparation des sauvegardes…');
   try {
-    const { files } = await P.Filesystem.readdir({ path: BACKUP_DIR, directory: 'DATA' });
+    let files;
+    try {
+      ({ files } = await P.Filesystem.readdir({ path: BACKUP_DIR, directory: 'DATA' }));
+    } catch {
+      files = []; // dossier pas encore créé : aucune sauvegarde n'a encore eu lieu, c'est normal
+    }
     if (!files.length) { setStatus('Aucune sauvegarde automatique pour le moment'); return; }
     const zip = new JSZip();
     for (const f of files) {
@@ -427,6 +440,8 @@ async function exportBackups() {
     setStatus(files.length + ' sauvegarde(s) exportée(s)');
   } catch (e) {
     setStatus('Export des sauvegardes : ' + (e.message || e));
+  } finally {
+    hideBusy();
   }
 }
 
@@ -597,10 +612,12 @@ function refreshTracesPanel() {
     li.innerHTML =
       '<span class="t-info"><span class="t-name">' + icon + esc(f.properties && f.properties.name || '(sans nom)') + '</span>' +
       '<span class="t-meta">' + metaLineFor(f) + '</span></span>' +
-      '<button class="t-zoom" title="Centrer sur la carte">🔍</button>' +
-      '<button class="t-ren" title="Renommer">✎</button>' +
-      '<button class="t-exp" title="Exporter">⬇</button>' +
-      '<button class="t-del" title="Supprimer">🗑</button>';
+      '<span class="t-actions">' +
+        '<button class="t-zoom" title="Centrer sur la carte">🔍</button>' +
+        '<button class="t-ren" title="Renommer">✎</button>' +
+        '<button class="t-exp" title="Exporter">⬇</button>' +
+        '<button class="t-del" title="Supprimer">🗑</button>' +
+      '</span>';
     li.querySelector('.t-zoom').addEventListener('click', () => zoomToFeature(f));
     li.querySelector('.t-ren').addEventListener('click', () => renameFeature(f));
     li.querySelector('.t-exp').addEventListener('click', () => exportOne(f));
@@ -641,9 +658,11 @@ async function exportOne(f) {
   if (!['gpx', 'kml', 'kmz'].includes(fmt)) return;
   const fallback = f.geometry.type === 'Point' ? 'waypoint' : 'trace';
   const base = ((f.properties && f.properties.name) || fallback).replace(/[^A-Za-z0-9._ -]/g, '_').trim() || fallback;
+  showBusy('Export ' + fmt.toUpperCase() + ' en cours…');
   try {
-    if (fmt === 'gpx') await saveFile(base + '.gpx', toGPX([f]), 'application/gpx+xml', false);
-    else if (fmt === 'kml') await saveFile(base + '.kml', toKML([f]), 'application/vnd.google-earth.kml+xml', false);
+    let tracklogError;
+    if (fmt === 'gpx') tracklogError = await exportTrackFile(base + '.gpx', toGPX([f]), 'application/gpx+xml', false);
+    else if (fmt === 'kml') tracklogError = await exportTrackFile(base + '.kml', toKML([f]), 'application/vnd.google-earth.kml+xml', false);
     else {
       const zip = new JSZip();
       if (f.properties && f.properties.photoId) {
@@ -652,11 +671,13 @@ async function exportOne(f) {
       }
       zip.file('doc.kml', toKML([f], { embedPhotos: true }));
       const b64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
-      await saveFile(base + '.kmz', b64, 'application/vnd.google-earth.kmz', true);
+      tracklogError = await exportTrackFile(base + '.kmz', b64, 'application/vnd.google-earth.kmz', true);
     }
-    setStatus('Export ' + fmt.toUpperCase() + ' prêt : ' + base);
+    setStatus('Export ' + fmt.toUpperCase() + ' prêt : ' + base + (tracklogError ? ' (Tracklogs : ' + tracklogError + ')' : ''));
   } catch (e) {
     setStatus('Export : ' + (e.message || e));
+  } finally {
+    hideBusy();
   }
 }
 
@@ -849,6 +870,30 @@ function toKML(list, opts = {}) {
   return s + '</Document></kml>\n';
 }
 
+/** Copie best-effort dans files/Tracklogs/ (dossier privé de l'app, visible via un gestionnaire
+ *  de fichiers sous Android/data/<app>/files/Tracklogs) — en plus du partage, pas à sa place. */
+async function saveToTracklogs(filename, data, isBase64, mime) {
+  if (!isNative || !Mbtiles) return 'indisponible hors APK';
+  try {
+    // Écrit dans Téléchargements/randos/Tracklogs/ via MediaStore (plugin natif) : le stockage
+    // privé de l'app (Directory.Data/Documents de @capacitor/filesystem) est invisible depuis
+    // l'extérieur sur Android 11+, même si l'écriture elle-même y réussit sans erreur.
+    await Mbtiles.saveDownload({ name: filename, data, isBase64, mime: mime || 'application/octet-stream', subdir: 'Tracklogs' });
+    return null; // succès
+  } catch (e) {
+    return e.message || String(e);
+  }
+}
+
+/** Export d'un fichier de trace (GPX/KML/KMZ) : copie dans Tracklogs puis partage habituel.
+ *  Retourne le message d'erreur de la copie Tracklogs (ou null si elle a réussi), pour que
+ *  l'appelant puisse le signaler plutôt que de l'avaler en silence. */
+async function exportTrackFile(filename, data, mime, isBase64) {
+  const tracklogError = await saveToTracklogs(filename, data, isBase64, mime);
+  await saveFile(filename, data, mime, isBase64);
+  return tracklogError;
+}
+
 async function saveFile(filename, data, mime, isBase64) {
   if (isNative && P.Filesystem && P.Share) {
     // Écriture dans le cache de l'app puis feuille de partage (Enregistrer dans Fichiers/Drive/…)
@@ -874,9 +919,11 @@ $('export').addEventListener('change', async (e) => {
   if (!fmt) return;
   if (!features.length) { setStatus('Rien à exporter'); return; }
   const stamp = localStampCompact();
+  showBusy('Export ' + fmt.toUpperCase() + ' en cours…');
   try {
-    if (fmt === 'gpx') await saveFile('rando-' + stamp + '.gpx', toGPX(features), 'application/gpx+xml', false);
-    else if (fmt === 'kml') await saveFile('rando-' + stamp + '.kml', toKML(features), 'application/vnd.google-earth.kml+xml', false);
+    let tracklogError;
+    if (fmt === 'gpx') tracklogError = await exportTrackFile('rando-' + stamp + '.gpx', toGPX(features), 'application/gpx+xml', false);
+    else if (fmt === 'kml') tracklogError = await exportTrackFile('rando-' + stamp + '.kml', toKML(features), 'application/vnd.google-earth.kml+xml', false);
     else if (fmt === 'kmz') {
       const zip = new JSZip();
       const photoFeatures = features.filter((f) => f.properties && f.properties.photoId);
@@ -886,11 +933,13 @@ $('export').addEventListener('change', async (e) => {
       }
       zip.file('doc.kml', toKML(features, { embedPhotos: true }));
       const b64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
-      await saveFile('rando-' + stamp + '.kmz', b64, 'application/vnd.google-earth.kmz', true);
+      tracklogError = await exportTrackFile('rando-' + stamp + '.kmz', b64, 'application/vnd.google-earth.kmz', true);
     }
-    setStatus('Export ' + fmt.toUpperCase() + ' prêt');
+    setStatus('Export ' + fmt.toUpperCase() + ' prêt' + (tracklogError ? ' (Tracklogs : ' + tracklogError + ')' : ''));
   } catch (err) {
     setStatus('Export : ' + (err.message || err));
+  } finally {
+    hideBusy();
   }
 });
 
@@ -1367,4 +1416,6 @@ $('offline-clear-all').addEventListener('click', async () => {
   if ('serviceWorker' in navigator && !isNative && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* ignoré */ });
   }
+
+  setStatus('Prêt — build ' + APP_BUILD); // affiché en dernier : confirme sans ambiguïté la version installée
 })();

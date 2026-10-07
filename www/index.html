@@ -11,23 +11,29 @@
 </head>
 <body>
   <header id="bar">
-    <button id="btn-lock" title="Verrouiller les boutons (recommandé en poche)">🔓</button>
-    <select id="basemap" aria-label="Fond de carte"></select>
-    <button id="btn-mbt" title="Importer un fichier MBTiles">MBTiles</button>
-    <button id="btn-xyz" title="Ajouter un fond XYZ">+XYZ</button>
-    <button id="btn-offline" title="Préparer le hors-ligne (télécharger la zone visible)">📥</button>
-    <button id="btn-import" title="Importer GPX / KML / KMZ">Import</button>
-    <select id="export" aria-label="Exporter">
-      <option value="">Export…</option>
-      <option value="gpx">GPX</option>
-      <option value="kml">KML</option>
-      <option value="kmz">KMZ</option>
-    </select>
-    <button id="btn-gps">GPS</button>
-    <button id="btn-wpt" title="Ajouter un waypoint">+WPT</button>
-    <button id="btn-rec">REC</button>
-    <button id="btn-traces" title="Liste des traces et waypoints">Traces</button>
-    <button id="btn-clear" title="Effacer les tracés">✕</button>
+    <div class="bar-group bar-group-field">
+      <button id="btn-lock" title="Verrouiller les boutons (recommandé en poche)">🔓</button>
+      <button id="btn-gps">📍 GPS</button>
+      <button id="btn-wpt" title="Ajouter un waypoint">🚩 Point</button>
+      <button id="btn-rec">⏺ REC</button>
+    </div>
+    <div class="bar-group bar-group-map">
+      <select id="basemap" aria-label="Fond de carte"></select>
+      <button id="btn-mbt" title="Importer un fichier MBTiles">🗄️ MBTiles</button>
+      <button id="btn-xyz" title="Ajouter un fond XYZ">🔗 +XYZ</button>
+      <button id="btn-offline" title="Préparer le hors-ligne (télécharger la zone visible)">📥 Hors-ligne</button>
+    </div>
+    <div class="bar-group bar-group-data">
+      <button id="btn-import" title="Importer GPX / KML / KMZ">⬆️ Import</button>
+      <select id="export" aria-label="Exporter">
+        <option value="">⬇️ Export…</option>
+        <option value="gpx">GPX</option>
+        <option value="kml">KML</option>
+        <option value="kmz">KMZ</option>
+      </select>
+      <button id="btn-traces" title="Liste des traces et waypoints">📋 Traces</button>
+      <button id="btn-clear" title="Effacer les tracés">🗑️ Effacer</button>
+    </div>
   </header>
   <div id="map">
     <div id="compass" class="hidden" aria-hidden="true">
@@ -115,6 +121,11 @@
         <button id="wpt-cancel">Annuler</button>
       </div>
     </div>
+  </div>
+
+  <div id="busy-overlay" class="hidden" aria-hidden="true">
+    <div id="busy-spinner"></div>
+    <div id="busy-text"></div>
   </div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
